@@ -24,12 +24,13 @@ const ADMIN_PASSWORD=String(process.env.ADMIN_PASSWORD||'');
 const SECRET=String(process.env.TOKEN_SECRET||'');
 const DATABASE_URL=String(process.env.DATABASE_URL||'');
 const MAX_TOTAL_VIDEO_BYTES=200*1000**3;
+const production=process.env.NODE_ENV==='production';
 const R2_ACCOUNT_ID=String(process.env.R2_ACCOUNT_ID||'');
 const R2_BUCKET=String(process.env.R2_BUCKET||'');
 const r2Ready=!!(R2_ACCOUNT_ID&&R2_BUCKET&&process.env.R2_ACCESS_KEY_ID&&process.env.R2_SECRET_ACCESS_KEY);
 
 if(!/^\S+@\S+\.\S+$/.test(ADMIN_EMAIL)||ADMIN_PASSWORD.length<8||SECRET.length<32)throw new Error('Set ADMIN_EMAIL, an ADMIN_PASSWORD of at least 8 characters, and a TOKEN_SECRET of at least 32 characters.');
-if(process.env.NODE_ENV==='production'&&(!DATABASE_URL||!r2Ready))throw new Error('Production requires DATABASE_URL and the R2 account ID, bucket, access key, and secret key.');
+if(production&&!DATABASE_URL)throw new Error('Production requires a DATABASE_URL for persistent account and chat storage.');
 
 const empty={users:[],videos:[],messages:[],notifications:[],next:{user:1,video:1,message:1,notification:1}};
 const pool=DATABASE_URL?new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:true},max:3,idleTimeoutMillis:30000,connectionTimeoutMillis:10000}):null;
@@ -130,7 +131,7 @@ app.get('/api/health',asyncRoute(async(req,res)=>{
   if(pool)await pool.query('SELECT 1');
   res.json({ok:true,service:'KRYNX Video Vault',time:now(),persistentDatabase:!!pool,objectStorage:!!s3});
 }));
-app.get('/api/storage/config',(req,res)=>res.json({directUploads:!!s3}));
+app.get('/api/storage/config',(req,res)=>res.json({directUploads:!!s3,fileUploads:!production||!!s3}));
 
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
   const email=String(req.body.email||'').trim().toLowerCase(),password=String(req.body.password||''),name=String(req.body.name||'').trim(),username=String(req.body.username||'').trim().replace(/^@/,'').toLowerCase();
@@ -187,7 +188,7 @@ app.get('/api/videos',auth,asyncRoute(async(req,res)=>{
   res.json(await Promise.all(db.videos.slice().sort((a,b)=>b.created_at.localeCompare(a.created_at)).map(videoView)));
 }));
 app.post('/api/videos/upload',auth,(req,res,next)=>{
-  if(s3)return res.status(410).json({error:'Use direct cloud upload for videos.'});
+  if(production)return res.status(410).json({error:'Direct video uploads are unavailable on this free deployment. Add an unlisted YouTube link instead.'});
   videoUpload.single('video')(req,res,err=>{
   if(err)return res.status(400).json({error:err.code==='LIMIT_FILE_SIZE'?'Video exceeds the 1GB limit.':err.message});
   if(!req.file)return res.status(400).json({error:'Choose a video file first.'});
@@ -238,7 +239,7 @@ app.post('/api/chat/message',auth,asyncRoute(async(req,res)=>{
   db.messages.push(m);await save();const view=await messageView(m);io.emit('chat:new',view);res.json(view);
 }));
 app.post('/api/chat/attachment',auth,(req,res,next)=>{
-  if(s3)return res.status(410).json({error:'Use direct cloud upload for attachments.'});
+  if(production)return res.status(410).json({error:'Chat file attachments are unavailable on this free deployment. Share a link in chat instead.'});
   fileUpload.single('file')(req,res,err=>{
   if(err)return res.status(400).json({error:'Attachment is too large or invalid.'});
   if(!req.file)return res.status(400).json({error:'Choose a file.'});
