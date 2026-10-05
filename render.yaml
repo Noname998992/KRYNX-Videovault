@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: krynx-video-vault
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci && npm --prefix server ci && npm --prefix client ci && npm --prefix client run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: krynx-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/krynx
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: TOKEN_SECRET
+        generateValue: true

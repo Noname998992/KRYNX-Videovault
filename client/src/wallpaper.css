@@ -1,0 +1,426 @@
+.bgslide {
+  inset: 0;
+  background-color: #090307;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: none;
+  transform: none;
+  transition: none;
+  will-change: opacity;
+}
+
+.bgslide.show {
+  animation: wallpaperFade 1s ease both;
+  opacity: 1;
+  transform: none;
+}
+
+.bgshade {
+  background:
+    linear-gradient(90deg, rgba(8, 1, 5, .24), rgba(9, 1, 5, .08) 55%, rgba(8, 1, 5, .28)),
+    linear-gradient(0deg, rgba(8, 1, 5, .4), rgba(8, 1, 5, .08) 55%, rgba(8, 1, 5, .24));
+  backdrop-filter: none;
+}
+
+.bglight {
+  opacity: .07;
+}
+
+.authcard,
+.side,
+.hero,
+.card,
+.panel,
+.loader {
+  backdrop-filter: none;
+}
+
+@keyframes wallpaperFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (orientation: portrait) {
+  .bgslide {
+    background-position: center;
+    background-size: contain;
+  }
+}
+
+.menuScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: rgba(3, 1, 5, .76);
+  backdrop-filter: blur(5px);
+  animation: menuScrimIn .2s ease both;
+}
+
+.side,
+.side.open {
+  z-index: 20;
+  width: min(290px, 84vw);
+  background:
+    linear-gradient(145deg, rgba(55, 5, 18, .98), rgba(10, 2, 8, .99) 46%),
+    #090307;
+  border-right: 1px solid rgba(255, 45, 75, .65);
+  box-shadow: 18px 0 48px rgba(0, 0, 0, .6), 3px 0 24px rgba(239, 35, 60, .16);
+  transition: transform .32s cubic-bezier(.2, .85, .25, 1);
+}
+
+.side {
+  transform: translateX(-105%);
+}
+
+.side.open {
+  transform: translateX(0);
+}
+
+.main {
+  width: 100%;
+  margin-left: 0;
+}
+
+.menubtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 77, 99, .72);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #a80e20, #300711 78%);
+  box-shadow: 0 0 0 3px rgba(239, 35, 60, .1), 0 7px 22px rgba(239, 35, 60, .22);
+  color: #fff;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.menubtn::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-top: 2px solid #ff7180;
+  border-right: 2px solid #ff7180;
+  content: "";
+  opacity: .9;
+}
+
+.menubtn:hover {
+  transform: translateY(-1px);
+  border-color: #ff8490;
+  box-shadow: 0 0 0 4px rgba(239, 35, 60, .14), 0 9px 26px rgba(239, 35, 60, .32);
+}
+
+.menubtn:active {
+  transform: scale(.95);
+}
+
+.menubtn:focus-visible,
+.side nav button:focus-visible {
+  outline: 2px solid #ff9aa5;
+  outline-offset: 3px;
+}
+
+.side nav button {
+  min-height: 46px;
+  border: 1px solid transparent;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.side nav button.active {
+  border-color: rgba(255, 70, 94, .32);
+  box-shadow: inset 3px 0 #ff334a, 0 5px 18px rgba(239, 35, 60, .12);
+}
+
+.side nav button:active {
+  transform: translateX(3px);
+}
+
+.customVideo {
+  position: relative;
+  background: #000;
+}
+
+.customVideo video {
+  display: block;
+  width: 100%;
+  height: min(68vh, 600px);
+  background: #000;
+  object-fit: contain;
+}
+
+.videoControls {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #16040a, #300711);
+  border-top: 1px solid rgba(255, 77, 99, .34);
+}
+
+.videoControls button {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 77, 99, .32);
+  border-radius: 9px;
+  background: rgba(239, 35, 60, .14);
+  color: #fff;
+}
+
+.videoControls button:hover {
+  background: rgba(239, 35, 60, .34);
+}
+
+.videoTime {
+  flex: 0 0 auto;
+  color: #e7dce0;
+  font: 500 11px/1 Inter, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.seekBar,
+.volumeBar {
+  height: 4px;
+  accent-color: #ef233c;
+  cursor: pointer;
+}
+
+.seekBar {
+  min-width: 40px;
+  flex: 1 1 auto;
+}
+
+.volumeBar {
+  width: 72px;
+  flex: 0 0 72px;
+}
+
+.mediaError {
+  padding: 15px 18px;
+  background: #350914;
+  border-top: 1px solid rgba(255, 77, 99, .38);
+  color: #ffb1ba;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.adminConsole {
+  display: grid;
+  gap: 18px;
+}
+
+.adminSection {
+  padding: 20px;
+}
+
+.adminSection > .panelhead {
+  margin-bottom: 16px;
+}
+
+.adminSection h3,
+.resetPasswordForm h4 {
+  margin: 0;
+}
+
+.adminCreateForm {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.adminCreateForm label {
+  display: grid;
+  gap: 7px;
+  color: #d7c9ce;
+  font-size: 11px;
+}
+
+.adminCreateForm input,
+.resetPasswordForm input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  outline: none;
+  background: rgba(7, 2, 5, .72);
+  color: #fff;
+}
+
+.adminCreateForm input:focus,
+.resetPasswordForm input:focus {
+  border-color: #ef334d;
+  box-shadow: 0 0 0 3px #ef233c18;
+}
+
+.adminCreateForm .cta {
+  min-height: 43px;
+  padding: 0 16px;
+}
+
+.adminSection > .hint {
+  margin: 12px 0 0;
+}
+
+.adminSection .userrow {
+  grid-template-columns: 36px minmax(0, 1fr) 55px 45px 34px 34px 34px;
+}
+
+.userIdentity,
+.adminVideoRow > div {
+  min-width: 0;
+}
+
+.userIdentity span,
+.adminVideoRow span {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #a99ca1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adminIconButton {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .04);
+  color: #e7dce0;
+}
+
+.adminIconButton:hover:not(:disabled) {
+  border-color: #ef233c99;
+  background: rgba(239, 35, 60, .14);
+}
+
+.adminIconButton.danger {
+  color: #ff7684;
+}
+
+.adminIconButton:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.resetPasswordForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(255, 77, 99, .28);
+  border-radius: 10px;
+  background: rgba(30, 5, 13, .56);
+}
+
+.resetPasswordForm h4 {
+  grid-column: 1 / -1;
+  color: #f4e9ed;
+  font-size: 13px;
+}
+
+.resetPasswordForm .cta,
+.resetPasswordForm .ghost {
+  min-height: 40px;
+  padding: 0 13px;
+}
+
+.adminVideoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffffff12;
+  color: #f4e9ed;
+  font-size: 12px;
+}
+
+.adminVideoRow:last-child {
+  border-bottom: 0;
+}
+
+.adminVideoRow b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customVideo:fullscreen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.customVideo:fullscreen video {
+  height: calc(100vh - 54px);
+}
+
+@keyframes menuScrimIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 620px) {
+  .adminSection {
+    padding: 14px;
+  }
+
+  .adminCreateForm {
+    grid-template-columns: 1fr;
+  }
+
+  .adminSection .userrow {
+    grid-template-columns: 34px minmax(0, 1fr) 32px 32px 32px;
+  }
+
+  .adminSection .userrow > strong,
+  .adminSection .userrow > small,
+  .adminSection .userrow > span {
+    display: none;
+  }
+
+  .resetPasswordForm {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .resetPasswordForm input {
+    grid-column: 1 / -1;
+  }
+
+  .videoControls {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .volumeBar {
+    width: 48px;
+    flex-basis: 48px;
+  }
+
+  .videoTime {
+    font-size: 10px;
+  }
+}
