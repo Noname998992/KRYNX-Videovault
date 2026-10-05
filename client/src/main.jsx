@@ -9,6 +9,16 @@ import './wallpaper.css';
 const api=axios.create({baseURL:''});
 api.interceptors.request.use(c=>{const t=localStorage.getItem('krynx_token');if(t)c.headers.Authorization=`Bearer ${t}`;return c});
 const socket=io({autoConnect:false});
+const uploadToCloud=(url,file,headers,onProgress)=>new Promise((resolve,reject)=>{
+  const request=new XMLHttpRequest();
+  request.open('PUT',url);
+  for(const [name,value] of Object.entries(headers||{}))request.setRequestHeader(name,value);
+  request.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100))};
+  request.onload=()=>request.status>=200&&request.status<300?resolve():reject(new Error(`Cloud upload failed (${request.status}).`));
+  request.onerror=()=>reject(new Error('Cloud upload failed. Check your connection and try again.'));
+  request.onabort=()=>reject(new Error('Cloud upload was cancelled.'));
+  request.send(file);
+});
 const externalUrl=value=>{try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)?url.href:null}catch{return null}};
 const formatTime=value=>{if(!Number.isFinite(value))return '0:00';const seconds=Math.floor(value);return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`};
 const linkPlayer=value=>{
@@ -126,7 +136,7 @@ function Dashboard({user,setUser}){
   </div>
 }
 
-function Home({user,setTab}){const [stats,setStats]=useState(null),[recent,setRecent]=useState([]),[player,setPlayer]=useState(null);useEffect(()=>{Promise.all([api.get('/api/videos'),user.role==='admin'?api.get('/api/admin/stats'):Promise.resolve({data:null})]).then(([v,s])=>{setRecent(v.data.slice(0,4));setStats(s.data)})},[]);return <div><section className="hero"><div><span className="pill">⚡ CLASS RESOURCE HUB</span><h1>Study. Store.<br/><em>Share.</em></h1><p>One private vault for your class videos, resources, links and conversations.</p><div className="heroBtns"><button className="cta" onClick={()=>setTab('upload')}>Upload a video <Upload size={17}/></button><button className="ghost" onClick={()=>setTab('videos')}>Browse vault <Video size={17}/></button></div></div><div className="heroart"><div className="ring">K</div><span>20+ anime scenes</span></div></section><div className="quick"><div><b>{stats?.videos??recent.length}</b><span>Resources</span></div><div><b>{stats?.users??'—'}</b><span>Members</span></div><div><b>1 GB</b><span>Max video</span></div><div><b>LIVE</b><span>Class chat</span></div></div><section><div className="sectionhead"><div><span className="eyebrow">LATEST</span><h3>Recently added</h3></div><button className="ghost" onClick={()=>setTab('videos')}>View all →</button></div><div className="cards">{recent.length?recent.map(v=><VideoCard key={v.id} v={v} open={setPlayer} isAdmin={user.role==='admin'}/>):<div className="empty">No videos yet. Upload your first class resource.</div>}</div></section>{player&&<Player v={player} close={()=>setPlayer(null)}/>}</div>}
+function Home({user,setTab}){const [stats,setStats]=useState(null),[recent,setRecent]=useState([]),[player,setPlayer]=useState(null);useEffect(()=>{Promise.all([api.get('/api/videos'),user.role==='admin'?api.get('/api/admin/stats'):Promise.resolve({data:null})]).then(([v,s])=>{setRecent(v.data.slice(0,4));setStats(s.data)})},[]);return <div><section className="hero"><div><span className="pill">⚡ CLASS RESOURCE HUB</span><h1>Study. Store.<br/><em>Share.</em></h1><p>One private vault for your class videos, resources, links and conversations.</p><div className="heroBtns"><button className="cta" onClick={()=>setTab('upload')}>Upload a video <Upload size={17}/></button><button className="ghost" onClick={()=>setTab('videos')}>Browse vault <Video size={17}/></button></div></div><div className="heroart"><div className="ring">K</div><span>20+ anime scenes</span></div></section><div className="quick"><div><b>{stats?.videos??recent.length}</b><span>Resources</span></div><div><b>{stats?.users??'—'}</b><span>Members</span></div><div><b>200 GB</b><span>Total vault limit</span></div><div><b>LIVE</b><span>Class chat</span></div></div><section><div className="sectionhead"><div><span className="eyebrow">LATEST</span><h3>Recently added</h3></div><button className="ghost" onClick={()=>setTab('videos')}>View all →</button></div><div className="cards">{recent.length?recent.map(v=><VideoCard key={v.id} v={v} open={setPlayer} isAdmin={user.role==='admin'}/>):<div className="empty">No videos yet. Upload your first class resource.</div>}</div></section>{player&&<Player v={player} close={()=>setPlayer(null)}/>}</div>}
 
 function Videos({user}){const [items,setItems]=useState([]),[q,setQ]=useState(''),[player,setPlayer]=useState(null);const load=()=>api.get('/api/videos').then(r=>setItems(r.data));useEffect(()=>{load();const add=v=>setItems(x=>[v,...x.filter(y=>y.id!==v.id)]),del=id=>setItems(x=>x.filter(v=>v.id!==id));socket.on('video:new',add);socket.on('video:deleted',del);return()=>{socket.off('video:new',add);socket.off('video:deleted',del)}},[]);const shown=useMemo(()=>items.filter(v=>(v.title+' '+v.description+' '+v.uploader_name).toLowerCase().includes(q.toLowerCase())),[items,q]);return <><div className="toolbar"><div className="search"><Search size={17}/><input placeholder="Search videos, people, topics…" value={q} onChange={e=>setQ(e.target.value)}/></div><button className="ghost" onClick={load}><RefreshCw size={16}/>Refresh</button></div><div className="cards">{shown.map(v=><VideoCard key={v.id} v={v} open={setPlayer} isAdmin={user?.role==='admin'}/>)}{!shown.length&&<div className="empty">No resources match your search.</div>}</div>{player&&<Player v={player} close={()=>setPlayer(null)}/>}</>}
 function VideoCard({v,open,isAdmin=false}){
@@ -175,8 +185,29 @@ function Player({v,close}){
   </div>
 }
 
-function UploadPage({setTab}){const [mode,setMode]=useState('file'),[f,setF]=useState({title:'',description:'',url:''}),[file,setFile]=useState(null),[msg,setMsg]=useState('');const submit=async e=>{e.preventDefault();setMsg('');try{let r;if(mode==='file'){if(!file)throw new Error('Select a video first.');const fd=new FormData();fd.append('video',file);fd.append('title',f.title);fd.append('description',f.description);r=await api.post('/api/videos/upload',fd,{onUploadProgress:p=>{if(p.total)setMsg(`Uploading ${Math.round(p.loaded/p.total*100)}%…`)}})}else r=await api.post('/api/videos/link',f);setMsg('Resource added successfully.');setF({title:'',description:'',url:''});setFile(null);setTimeout(()=>setTab('videos'),500)}catch(e){setMsg(e.response?.data?.error||e.message||'Upload failed')}};return <div className="uploadgrid"><section className="panel"><div className="tabs"><button className={mode==='file'?'sel':''} onClick={()=>setMode('file')}><Upload size={16}/> Device</button><button className={mode==='link'?'sel':''} onClick={()=>setMode('link')}><LinkIcon size={16}/> Link</button></div><form onSubmit={submit}><label>Title<input value={f.title} onChange={e=>setF({...f,title:e.target.value})} placeholder="e.g. Compiler Design Unit 3"/></label><label>Description<textarea value={f.description} onChange={e=>setF({...f,description:e.target.value})} placeholder="What is this resource about?"/></label>{mode==='file'?<label className="drop"><input type="file" accept="video/*" onChange={e=>setFile(e.target.files?.[0]||null)}/><Upload size={34}/><b>{file?file.name:'Choose a video'}</b><span>MP4, WebM, MOV • Maximum 1GB</span></label>:<label>Video / resource URL<input type="url" required value={f.url} onChange={e=>setF({...f,url:e.target.value})} placeholder="https://…"/><span className="hint">Links open in the in-app player when supported. YouTube and common video links are handled automatically; some sites block embedding.</span></label>} {msg&&<div className="status">{msg}</div>}<button className="cta">{mode==='file'?'UPLOAD VIDEO':'SAVE LINK'}</button></form></section><aside className="panel rules"><h3>Vault rules</h3><p>🎓 Use this for educational/class resources.</p><p>🎥 Local videos are limited to 1GB.</p><p>🔗 Open saved links in the in-app player. Playback can be blocked by the source website.</p><p>🛡️ You can delete your own uploads. Admins can manage everything.</p></aside></div>}
-
+function UploadPage({setTab}){
+  const [mode,setMode]=useState('file'),[f,setF]=useState({title:'',description:'',url:''}),[file,setFile]=useState(null),[msg,setMsg]=useState('');
+  const submit=async e=>{
+    e.preventDefault();setMsg('');
+    try{
+      if(mode==='file'){
+        if(!file)throw new Error('Select a video first.');
+        const {data:config}=await api.get('/api/storage/config');
+        if(config.directUploads){
+          const contentType=file.type||'application/octet-stream';
+          const {data:upload}=await api.post('/api/storage/upload-url',{purpose:'video',size:file.size,contentType,fileName:file.name});
+          await uploadToCloud(upload.uploadUrl,file,upload.headers,percent=>setMsg('Uploading '+percent+'%?'));
+          await api.post('/api/videos/upload-complete',{key:upload.key,title:f.title,description:f.description,originalName:file.name});
+        }else{
+          const formData=new FormData();formData.append('video',file);formData.append('title',f.title);formData.append('description',f.description);
+          await api.post('/api/videos/upload',formData,{onUploadProgress:p=>{if(p.total)setMsg('Uploading '+Math.round(p.loaded/p.total*100)+'%?')}});
+        }
+      }else await api.post('/api/videos/link',f);
+      setMsg('Resource added successfully.');setF({title:'',description:'',url:''});setFile(null);setTimeout(()=>setTab('videos'),500);
+    }catch(e){setMsg(e.response?.data?.error||e.message||'Upload failed')}
+  };
+  return <div className="uploadgrid"><section className="panel"><div className="tabs"><button className={mode==='file'?'sel':''} onClick={()=>setMode('file')}><Upload size={16}/> Device</button><button className={mode==='link'?'sel':''} onClick={()=>setMode('link')}><LinkIcon size={16}/> Link</button></div><form onSubmit={submit}><label>Title<input value={f.title} onChange={e=>setF({...f,title:e.target.value})} placeholder="e.g. Compiler Design Unit 3"/></label><label>Description<textarea value={f.description} onChange={e=>setF({...f,description:e.target.value})} placeholder="What is this resource about?"/></label>{mode==='file'?<label className="drop"><input type="file" accept="video/*" onChange={e=>setFile(e.target.files?.[0]||null)}/><Upload size={34}/><b>{file?file.name:'Choose a video'}</b><span>MP4, WebM, MOV ? Maximum 1GB per video</span></label>:<label>Video / resource URL<input type="url" required value={f.url} onChange={e=>setF({...f,url:e.target.value})} placeholder="https://?"/><span className="hint">Links open in the in-app player when supported. YouTube and common video links are handled automatically; some sites block embedding.</span></label>} {msg&&<div className="status">{msg}</div>}<button className="cta">{mode==='file'?'UPLOAD VIDEO':'SAVE LINK'}</button></form></section><aside className="panel rules"><h3>Vault rules</h3><p>?? Use this for educational/class resources.</p><p>?? Videos can be up to 1GB each and are stored in cloud object storage.</p><p>?? Open saved links in the in-app player. Playback can be blocked by the source website.</p><p>??? You can delete your own uploads. Admins can manage everything.</p></aside></div>
+}
 function Chat({user}){
   const [msgs,setMsgs]=useState([]),[online,setOnline]=useState([]),[text,setText]=useState(''),[file,setFile]=useState(null),[error,setError]=useState(''),bottom=useRef();
   useEffect(()=>{
@@ -208,8 +239,7 @@ function Chat({user}){
     if(!text.trim()&&!file)return;
     setError('');
     try{
-      if(file){const formData=new FormData();formData.append('file',file);formData.append('text',text);await api.post('/api/chat/attachment',formData)}
-      else await api.post('/api/chat/message',{text});
+      if(file){const {data:config}=await api.get('/api/storage/config');if(config.directUploads){const {data:upload}=await api.post('/api/storage/upload-url',{purpose:'chat',size:file.size,contentType:file.type||'application/octet-stream',fileName:file.name});await uploadToCloud(upload.uploadUrl,file,upload.headers,()=>{});await api.post('/api/chat/attachment-complete',{key:upload.key,text,originalName:file.name})}else{const formData=new FormData();formData.append('file',file);formData.append('text',text);await api.post('/api/chat/attachment',formData)}}else await api.post('/api/chat/message',{text});
       setText('');
       setFile(null);
     }catch(e){setError(e.response?.data?.error||'Could not send the message.')}
