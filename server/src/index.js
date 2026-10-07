@@ -33,7 +33,7 @@ if(!/^\S+@\S+\.\S+$/.test(ADMIN_EMAIL)||ADMIN_PASSWORD.length<8||SECRET.length<3
 if(production&&!DATABASE_URL)throw new Error('Production requires a DATABASE_URL for persistent account and chat storage.');
 
 const empty={users:[],videos:[],messages:[],notifications:[],next:{user:1,video:1,message:1,notification:1}};
-const pool=DATABASE_URL?new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:true},max:3,idleTimeoutMillis:30000,connectionTimeoutMillis:10000}):null;
+const pool=DATABASE_URL?new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:false},max:3,idleTimeoutMillis:30000,connectionTimeoutMillis:10000}):null;
 const s3=r2Ready?new S3Client({region:'auto',endpoint:`https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,credentials:{accessKeyId:process.env.R2_ACCESS_KEY_ID,secretAccessKey:process.env.R2_SECRET_ACCESS_KEY}}):null;
 fs.mkdirSync(UPLOADS,{recursive:true});
 

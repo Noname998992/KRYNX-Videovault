@@ -36,6 +36,8 @@ There is **no free, private 200GB video bucket** in this setup. Instead, upload 
 
 The Supabase Free project is configured in the Singapore region. Use a strong private database password; enter it only in provider forms. From **Project Settings → Database**, copy the Postgres **Session pooler** connection string; the app creates its `krynx_app_state` table automatically when deployed.
 
+Database connections require TLS encryption. The Node Postgres client accepts the Supabase pooler's certificate without validating it against Render's local certificate authorities; use this only with the official Supabase Session Pooler URI and keep `DATABASE_URL` private.
+
 To deploy:
 1. In Render, create a **Blueprint** from this GitHub repository and select the `main` branch.
 2. Enter `ADMIN_EMAIL` and the Supabase `DATABASE_URL` when prompted. Render generates `ADMIN_PASSWORD` and `TOKEN_SECRET`.
