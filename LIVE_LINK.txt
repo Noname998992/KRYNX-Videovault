@@ -1,3 +1,1 @@
-Not deployed yet.
-
-After Render deploys the repository, replace this file with the service URL shown in the Render dashboard.
+https://krynx-videovault.onrender.com/
