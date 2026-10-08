@@ -23,11 +23,14 @@ const ADMIN_EMAIL=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();
 const ADMIN_PASSWORD=String(process.env.ADMIN_PASSWORD||'');
 const SECRET=String(process.env.TOKEN_SECRET||'');
 const DATABASE_URL=String(process.env.DATABASE_URL||'');
+const OPENAI_API_KEY=String(process.env.OPENAI_API_KEY||'').trim();
+const OPENAI_MODEL=String(process.env.OPENAI_MODEL||'gpt-4o-mini').trim();
 const MAX_TOTAL_VIDEO_BYTES=200*1000**3;
 const production=process.env.NODE_ENV==='production';
 const R2_ACCOUNT_ID=String(process.env.R2_ACCOUNT_ID||'');
 const R2_BUCKET=String(process.env.R2_BUCKET||'');
 const r2Ready=!!(R2_ACCOUNT_ID&&R2_BUCKET&&process.env.R2_ACCESS_KEY_ID&&process.env.R2_SECRET_ACCESS_KEY);
+const aiRequests=new Map();
 
 if(!/^\S+@\S+\.\S+$/.test(ADMIN_EMAIL)||ADMIN_PASSWORD.length<8||SECRET.length<32)throw new Error('Set ADMIN_EMAIL, an ADMIN_PASSWORD of at least 8 characters, and a TOKEN_SECRET of at least 32 characters.');
 if(production&&!DATABASE_URL)throw new Error('Production requires a DATABASE_URL for persistent account and chat storage.');
@@ -132,6 +135,60 @@ app.get('/api/health',asyncRoute(async(req,res)=>{
   res.json({ok:true,service:'KRYNX Video Vault',time:now(),persistentDatabase:!!pool,objectStorage:!!s3});
 }));
 app.get('/api/storage/config',(req,res)=>res.json({directUploads:!!s3,fileUploads:!production||!!s3}));
+app.post('/api/ai/chat',auth,asyncRoute(async(req,res)=>{
+  if(!OPENAI_API_KEY)return res.status(503).json({error:'AI Buddy is not configured yet. Add OPENAI_API_KEY to the Render service environment.'});
+  const messages=req.body.messages;
+  if(!Array.isArray(messages)||messages.length<1||messages.length>12)return res.status(400).json({error:'Send between 1 and 12 recent chat messages.'});
+  const normalized=[];
+  let totalLength=0;
+  for(const message of messages){
+    if(!message||!['user','assistant'].includes(message.role)||typeof message.content!=='string')return res.status(400).json({error:'The chat history contains an invalid message.'});
+    const content=message.content.trim();
+    if(!content||content.length>4000)return res.status(400).json({error:'Each message must contain 1 to 4,000 characters.'});
+    totalLength+=content.length;
+    if(totalLength>12000)return res.status(400).json({error:'The recent chat history is too long. Start a new chat and try again.'});
+    normalized.push({role:message.role,content});
+  }
+  if(normalized.at(-1).role!=='user')return res.status(400).json({error:'The latest chat message must be from you.'});
+  const windowStart=Date.now()-60_000;
+  const recent=(aiRequests.get(req.user.id)||[]).filter(time=>time>windowStart);
+  if(recent.length>=10)return res.status(429).json({error:'You have reached the AI Buddy limit of 10 messages per minute. Please wait and try again.'});
+  recent.push(Date.now());
+  aiRequests.set(req.user.id,recent);
+  if(aiRequests.size>1000)for(const [id,times] of aiRequests)if(!times.some(time=>time>windowStart))aiRequests.delete(id);
+
+  let response;
+  try{
+    response=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${OPENAI_API_KEY}`,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:OPENAI_MODEL,
+        messages:[
+          {role:'system',content:`You are KRYNX AI Buddy, a friendly, thoughtful, conversational study and everyday assistant. Respond naturally to greetings and general conversation, answer questions directly, explain concepts clearly, and adapt detail to the user's request. For learning questions, support understanding with examples and optional practice questions. Do not insist that the user consult vault resources unless relevant. You cannot see or search the user's private vault, class chat, or account data unless it is explicitly included in the conversation. Be honest about uncertainty and capabilities. Keep responses clear and reasonably concise.`},
+          ...normalized
+        ],
+        max_tokens:700,
+        temperature:0.7
+      }),
+      signal:AbortSignal.timeout(30_000)
+    });
+  }catch(error){
+    if(error.name==='TimeoutError')return res.status(504).json({error:'The AI Buddy took too long to respond. Please try again.'});
+    console.error('Could not reach OpenAI:',error.message);
+    return res.status(502).json({error:'Could not reach the AI service. Please try again shortly.'});
+  }
+  const result=await response.json().catch(()=>null);
+  if(!response.ok){
+    if(response.status===429)return res.status(429).json({error:'The AI service is busy or its usage limit has been reached. Please try again later.'});
+    if(response.status===401||response.status===403)return res.status(502).json({error:'The AI provider rejected its server configuration. Ask the administrator to check the OpenAI API key.'});
+    console.error('OpenAI chat request failed:',response.status,result?.error?.type||'unknown provider error');
+    return res.status(502).json({error:'The AI Buddy could not get a response right now. Please try again shortly.'});
+  }
+  const reply=result?.choices?.[0]?.message?.content;
+  if(typeof reply!=='string'||!reply.trim())return res.status(502).json({error:'The AI provider returned an empty response. Please try again.'});
+  res.json({reply:reply.trim()});
+}));
 
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
   const email=String(req.body.email||'').trim().toLowerCase(),password=String(req.body.password||''),name=String(req.body.name||'').trim(),username=String(req.body.username||'').trim().replace(/^@/,'').toLowerCase();

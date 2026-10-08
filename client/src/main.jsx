@@ -251,7 +251,39 @@ function Chat({user}){
 }
 
 function Profile({user,setUser}){const [f,setF]=useState(user),[pw,setPw]=useState({currentPassword:'',newPassword:''}),[msg,setMsg]=useState('');const save=async()=>{try{const r=await api.put('/api/me',f);setF(r.data);setUser(r.data);setMsg('Profile updated. Admins are notified of changes.')}catch(e){setMsg(e.response?.data?.error||'Update failed')}};const change=async()=>{try{await api.put('/api/me/password',pw);setPw({currentPassword:'',newPassword:''});setMsg('Password changed. Admin notification sent.')}catch(e){setMsg(e.response?.data?.error||'Password change failed')}};return <div className="profilegrid"><section className="panel"><div className="profiletop"><div className="avatar xl">{f.avatar?<img src={f.avatar}/>:f.name?.[0]}</div><div><h3>{f.name}</h3><span>@{f.username}</span></div></div><label>Name<input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></label><label>Username<input value={f.username} onChange={e=>setF({...f,username:e.target.value})}/></label><label>Profile photo URL<input value={f.avatar||''} onChange={e=>setF({...f,avatar:e.target.value})} placeholder="https://…"/></label><label>Email<input value={f.email} disabled/></label><button className="cta" onClick={save}>Save profile</button>{msg&&<div className="status">{msg}</div>}</section><section className="panel"><div className="iconbox"><Lock/></div><h3>Change password</h3>{user.role==='admin'?<p className="hint">Admin password is controlled by the server and cannot be changed here.</p>:<><input type="password" placeholder="Current password" value={pw.currentPassword} onChange={e=>setPw({...pw,currentPassword:e.target.value})}/><input type="password" placeholder="New password" value={pw.newPassword} onChange={e=>setPw({...pw,newPassword:e.target.value})}/><button className="ghost" onClick={change}>Update password</button></>}</section></div>}
-function AI({user}){const [m,setM]=useState([{r:'ai',t:`Hey ${user.name.split(' ')[0]} 👋 I’m KRYNX AI Buddy. Ask me about a study topic, a video, or how to organize your resources.`}]),[t,setT]=useState('');const send=e=>{e.preventDefault();if(!t.trim())return;const q=t;setT('');setM(x=>[...x,{r:'me',t:q},{r:'ai',t:`For “${q}”, start with the vault resources, make 5 recall questions, and explain the concept without notes. This local demo is ready for a real AI API later.`}])};return <div className="panel ai"><div className="aitop"><Bot/><div><h3>KRYNX AI Buddy</h3><span>Study assistant</span></div></div><div className="aimsgs">{m.map((x,i)=><div className={x.r==='me'?'aimsg me':'aimsg'} key={i}>{x.t}</div>)}</div><form onSubmit={send}><input value={t} onChange={e=>setT(e.target.value)} placeholder="Ask your study buddy…"/><button className="cta"><Send/></button></form></div>}
+function AI({user}){
+  const [messages,setMessages]=useState([]);
+  const [text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const send=async e=>{
+    e.preventDefault();
+    const prompt=text.trim();
+    if(!prompt||busy)return;
+    const next=[...messages,{role:'user',text:prompt}];
+    setMessages(next);
+    setText('');
+    setError('');
+    setBusy(true);
+    try{
+      const history=next.slice(-12).map(message=>({role:message.role,content:message.text}));
+      const {data}=await api.post('/api/ai/chat',{messages:history});
+      setMessages(current=>[...current,{role:'assistant',text:data.reply}]);
+    }catch(err){
+      setError(err.response?.data?.error||'AI Buddy could not connect. Please try again.');
+    }finally{
+      setBusy(false);
+    }
+  };
+  return <div className="panel ai">
+    <div className="aitop"><Bot/><div><h3>KRYNX AI Buddy</h3><span>Ask anything. Powered by OpenAI.</span></div></div>
+    <div className="aimsgs" aria-live="polite">
+      <div className="aimsg">Hey {user.name.split(' ')[0]} 👋 I’m KRYNX AI Buddy. Ask me anything—study questions, explanations, or just say hi.</div>
+      {messages.map((message,index)=><div className={message.role==='user'?'aimsg me':'aimsg'} key={index}>{message.text}</div>)}
+      {busy&&<div className="aimsg" role="status">Thinking…</div>}
+    </div>
+    {error&&<div className="alert" role="alert">{error}</div>}
+    <form onSubmit={send}><input value={text} onChange={e=>setText(e.target.value)} placeholder="Ask your study buddy…" maxLength={4000} disabled={busy}/><button className="cta" disabled={busy||!text.trim()} aria-label="Send message"><Send/></button></form>
+  </div>
+}
 function Admin({user}){
   const [stats,setStats]=useState({}),[users,setUsers]=useState([]),[videos,setVideos]=useState([]),[notifs,setNotifs]=useState([]);
   const [account,setAccount]=useState({name:'',email:'',password:''}),[reset,setReset]=useState({userId:null,password:''}),[message,setMessage]=useState(''),[error,setError]=useState('');
