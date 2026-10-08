@@ -274,7 +274,7 @@ function AI({user}){
     }
   };
   return <div className="panel ai">
-    <div className="aitop"><Bot/><div><h3>KRYNX AI Buddy</h3><span>Ask anything. Powered by OpenAI.</span></div></div>
+    <div className="aitop"><Bot/><div><h3>KRYNX AI Buddy</h3><span>Ask anything. Powered by Gemini.</span></div></div>
     <div className="aimsgs" aria-live="polite">
       <div className="aimsg">Hey {user.name.split(' ')[0]} 👋 I’m KRYNX AI Buddy. Ask me anything—study questions, explanations, or just say hi.</div>
       {messages.map((message,index)=><div className={message.role==='user'?'aimsg me':'aimsg'} key={index}>{message.text}</div>)}

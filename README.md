@@ -39,7 +39,7 @@ The Supabase Free project is configured in the Singapore region. Use a strong pr
 Database connections require TLS encryption. The Node Postgres client accepts the Supabase pooler's certificate without validating it against Render's local certificate authorities; use this only with the official Supabase Session Pooler URI and keep `DATABASE_URL` private.
 
 ### AI Buddy
-The AI Buddy uses the OpenAI API from the server; its API key is never sent to the browser. Create an API key in the OpenAI Platform, add it to the Render web service as `OPENAI_API_KEY`, and redeploy. API usage may incur charges according to your OpenAI account's current pricing and limits. The default model is `gpt-4o-mini`; set `OPENAI_MODEL` on the server to use another compatible Chat Completions model. Never commit or share the API key.
+The AI Buddy uses the Gemini API from the server; its API key is never sent to the browser. Create a Gemini API key in Google AI Studio, add it to the Render web service as `GEMINI_API_KEY`, and redeploy. Gemini API availability, free-tier eligibility, limits, and billing depend on Google's current terms and the selected model/region. The default model is `gemini-2.5-flash`; set `GEMINI_MODEL` on the server to use another supported Gemini text-generation model. Never commit or share the API key.
 
 To deploy:
 1. In Render, create a **Blueprint** from this GitHub repository and select the `main` branch.

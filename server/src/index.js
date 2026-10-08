@@ -23,8 +23,8 @@ const ADMIN_EMAIL=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();
 const ADMIN_PASSWORD=String(process.env.ADMIN_PASSWORD||'');
 const SECRET=String(process.env.TOKEN_SECRET||'');
 const DATABASE_URL=String(process.env.DATABASE_URL||'');
-const OPENAI_API_KEY=String(process.env.OPENAI_API_KEY||'').trim();
-const OPENAI_MODEL=String(process.env.OPENAI_MODEL||'gpt-4o-mini').trim();
+const GEMINI_API_KEY=String(process.env.GEMINI_API_KEY||'').trim();
+const GEMINI_MODEL=String(process.env.GEMINI_MODEL||'gemini-2.5-flash').trim();
 const MAX_TOTAL_VIDEO_BYTES=200*1000**3;
 const production=process.env.NODE_ENV==='production';
 const R2_ACCOUNT_ID=String(process.env.R2_ACCOUNT_ID||'');
@@ -136,7 +136,7 @@ app.get('/api/health',asyncRoute(async(req,res)=>{
 }));
 app.get('/api/storage/config',(req,res)=>res.json({directUploads:!!s3,fileUploads:!production||!!s3}));
 app.post('/api/ai/chat',auth,asyncRoute(async(req,res)=>{
-  if(!OPENAI_API_KEY)return res.status(503).json({error:'AI Buddy is not configured yet. Add OPENAI_API_KEY to the Render service environment.'});
+  if(!GEMINI_API_KEY)return res.status(503).json({error:'AI Buddy is not configured yet. Add GEMINI_API_KEY to the Render service environment.'});
   const messages=req.body.messages;
   if(!Array.isArray(messages)||messages.length<1||messages.length>12)return res.status(400).json({error:'Send between 1 and 12 recent chat messages.'});
   const normalized=[];
@@ -159,35 +159,34 @@ app.post('/api/ai/chat',auth,asyncRoute(async(req,res)=>{
 
   let response;
   try{
-    response=await fetch('https://api.openai.com/v1/chat/completions',{
+    response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,{
       method:'POST',
-      headers:{Authorization:`Bearer ${OPENAI_API_KEY}`,'Content-Type':'application/json'},
+      headers:{'x-goog-api-key':GEMINI_API_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:OPENAI_MODEL,
-        messages:[
-          {role:'system',content:`You are KRYNX AI Buddy, a friendly, thoughtful, conversational study and everyday assistant. Respond naturally to greetings and general conversation, answer questions directly, explain concepts clearly, and adapt detail to the user's request. For learning questions, support understanding with examples and optional practice questions. Do not insist that the user consult vault resources unless relevant. You cannot see or search the user's private vault, class chat, or account data unless it is explicitly included in the conversation. Be honest about uncertainty and capabilities. Keep responses clear and reasonably concise.`},
-          ...normalized
-        ],
-        max_tokens:700,
-        temperature:0.7
+        systemInstruction:{parts:[{text:'You are KRYNX AI Buddy, a friendly, thoughtful, conversational study and everyday assistant. Respond naturally to greetings and general conversation, answer questions directly, explain concepts clearly, and adapt detail to the user’s request. For learning questions, support understanding with examples and optional practice questions. Do not insist that the user consult vault resources unless relevant. You cannot see or search the user’s private vault, class chat, or account data unless it is explicitly included in the conversation. Be honest about uncertainty and capabilities. Keep responses clear and reasonably concise.'}]},
+        contents:normalized.map(message=>({role:message.role==='assistant'?'model':'user',parts:[{text:message.content}]})),
+        generationConfig:{maxOutputTokens:700,temperature:0.7}
       }),
       signal:AbortSignal.timeout(30_000)
     });
   }catch(error){
     if(error.name==='TimeoutError')return res.status(504).json({error:'The AI Buddy took too long to respond. Please try again.'});
-    console.error('Could not reach OpenAI:',error.message);
+    console.error('Could not reach Gemini:',error.message);
     return res.status(502).json({error:'Could not reach the AI service. Please try again shortly.'});
   }
   const result=await response.json().catch(()=>null);
   if(!response.ok){
-    if(response.status===429)return res.status(429).json({error:'The AI service is busy or its usage limit has been reached. Please try again later.'});
-    if(response.status===401||response.status===403)return res.status(502).json({error:'The AI provider rejected its server configuration. Ask the administrator to check the OpenAI API key.'});
-    console.error('OpenAI chat request failed:',response.status,result?.error?.type||'unknown provider error');
+    if(response.status===429||result?.error?.status==='RESOURCE_EXHAUSTED')return res.status(429).json({error:'Gemini has reached its current rate or usage limit. Please wait and try again later, or check the API key’s quota.'});
+    if(response.status===401||response.status===403||result?.error?.status==='PERMISSION_DENIED'||result?.error?.status==='INVALID_ARGUMENT'){
+      console.error('Gemini rejected its API configuration:',response.status,result?.error?.status||'unknown provider error');
+      return res.status(502).json({error:'Gemini rejected its API configuration. Check that GEMINI_API_KEY is valid and Gemini API access is enabled.'});
+    }
+    console.error('Gemini chat request failed:',response.status,result?.error?.status||'unknown provider error');
     return res.status(502).json({error:'The AI Buddy could not get a response right now. Please try again shortly.'});
   }
-  const reply=result?.choices?.[0]?.message?.content;
-  if(typeof reply!=='string'||!reply.trim())return res.status(502).json({error:'The AI provider returned an empty response. Please try again.'});
-  res.json({reply:reply.trim()});
+  const reply=result?.candidates?.[0]?.content?.parts?.map(part=>part.text||'').join('').trim();
+  if(!reply)return res.status(502).json({error:'Gemini returned no text response. Please rephrase your message and try again.'});
+  res.json({reply});
 }));
 
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
